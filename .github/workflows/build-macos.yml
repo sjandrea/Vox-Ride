@@ -1,0 +1,52 @@
+name: Build macOS (AU + VST3)
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to publish a Release when a v* tag is pushed
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build (universal arm64 + x86_64)
+        run: cmake --build build --config Release --target VoxPilot_AU VoxPilot_VST3 -j 4
+
+      - name: Sign (ad-hoc) and validate Audio Unit
+        run: |
+          COMP="$HOME/Library/Audio/Plug-Ins/Components/VoxPilot.component"
+          VST3="$HOME/Library/Audio/Plug-Ins/VST3/VoxPilot.vst3"
+          codesign --force --deep -s - "$COMP"
+          codesign --force --deep -s - "$VST3"
+          lipo -info "$COMP/Contents/MacOS/VoxPilot"
+          killall -9 AudioComponentRegistrar || true
+          auval -v aufx Vxpl Sbau
+          mkdir -p dist
+          cp -R "$COMP" "$VST3" dist/
+          cp README.md dist/
+          (cd dist && ditto -c -k --keepParent VoxPilot.component ../VoxPilot-AU.zip \
+                   && ditto -c -k --keepParent VoxPilot.vst3 ../VoxPilot-VST3.zip)
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VoxPilot-macOS
+          path: dist
+
+      - name: Publish Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            VoxPilot-AU.zip
+            VoxPilot-VST3.zip
