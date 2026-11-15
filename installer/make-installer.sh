@@ -19,7 +19,14 @@ ditto "$VST3"      "$WORK/vst3/Library/Audio/Plug-Ins/VST3/VoxPilot.vst3"
 # Hindre at Installer «flytter» installasjonen til en eldre kopi den finner et annet sted på disken
 make_component_plist () {
     pkgbuild --analyze --root "$1" "$2" >/dev/null
-    /usr/libexec/PlistBuddy -c "Set :0:BundleIsRelocatable false" "$2"
+    local n i=0
+    n=$(/usr/libexec/PlistBuddy -c "Print" "$2" | grep -c "RootRelativeBundlePath" || true)
+    while [ "$i" -lt "$n" ]; do
+        /usr/libexec/PlistBuddy -c "Set :$i:BundleIsRelocatable false" "$2" 2>/dev/null \
+            || /usr/libexec/PlistBuddy -c "Add :$i:BundleIsRelocatable bool false" "$2" 2>/dev/null || true
+        i=$((i + 1))
+    done
+    plutil -p "$2"
 }
 make_component_plist "$WORK/au"   "$WORK/au.plist"
 make_component_plist "$WORK/vst3" "$WORK/vst3.plist"
