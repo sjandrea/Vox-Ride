@@ -1,0 +1,4 @@
+#!/bin/bash
+# Få macOS (og Logic) til å registrere den nye Audio Uniten uten omstart av maskinen
+killall -9 AudioComponentRegistrar 2>/dev/null || true
+exit 0

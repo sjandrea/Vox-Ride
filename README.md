@@ -6,6 +6,24 @@ kontinuerlig og justerer gainen mykt opp og ned slik at vokalen ligger jevnt run
 
 ![VoxPilot](docs/screenshot.png)
 
+## Installere (enklest)
+
+1. Last ned **`VoxPilot-<versjon>.pkg`** fra [Releases](https://github.com/sjandrea/Vox-Ride/releases/latest).
+2. Dobbeltklikk på filen og følg installeren (krever administratorpassord).
+   Under *Tilpass* kan du velge bort AU eller VST3.
+3. Start Logic Pro og velg *Audio Units → SB Audio → VoxPilot*.
+
+**Første gang macOS sier at pakken «ikke ble åpnet» / «Apple kunne ikke verifisere»:**
+installeren er ikke signert med et betalt Apple-utviklersertifikat. Trykk **Ferdig**, åpne
+*Systeminnstillinger → Personvern og sikkerhet*, rull ned og trykk **Åpne likevel** ved VoxPilot, og
+dobbeltklikk pakken igjen. (På macOS 14 og eldre holder det å høyreklikke pakken og velge *Åpne*.)
+
+Avinstallere:
+
+```bash
+sudo rm -rf /Library/Audio/Plug-Ins/Components/VoxPilot.component /Library/Audio/Plug-Ins/VST3/VoxPilot.vst3
+```
+
 ## Kontroller
 
 | Kontroll | Hva den gjør |
@@ -55,7 +73,11 @@ viser pluginen: *Logic Pro → Settings → Plug-in Manager → Reset & Rescan S
 ### Automatisk bygg på GitHub
 
 Hver push til `main` bygges på en macOS-maskin hos GitHub (`.github/workflows/build-macos.yml`): universell AU + VST3,
-ad-hoc-signert og validert med `auval`. Resultatet ligger under **Actions → siste kjøring → Artifacts → VoxPilot-macOS**.
+ad-hoc-signert, pakket i en `.pkg`-installer (`installer/`) som prøveinstalleres, og AU-en valideres med `auval`.
+Resultatet ligger under **Actions → siste kjøring → Artifacts**.
+
+Når du publiserer en Release på GitHub, brukes taggen (f.eks. `1.0.1`) som versjonsnummer for både pluginen og
+installeren, og `VoxPilot-1.0.1.pkg` legges automatisk ved releasen.
 
 Lag en versjon med nedlastbar Release:
 

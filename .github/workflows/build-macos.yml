@@ -1,4 +1,4 @@
-name: Build macOS (AU + VST3)
+name: Build macOS (AU + VST3 + installer)
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
     tags: ["v*", "[0-9]*"]
   pull_request:
   release:
-    types: [published]   # a Release created on github.com gets the AU/VST3 zips attached
+    types: [published]   # a Release created on github.com gets the installer attached
   workflow_dispatch:
     inputs:
       release_tag:
@@ -15,47 +15,73 @@ on:
         default: ""
 
 permissions:
-  contents: write   # needed to publish a Release when a v* tag is pushed
+  contents: write   # needed to attach files to a Release
 
 jobs:
   build:
     runs-on: macos-latest
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag || github.event.release.tag_name || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || '' }}
     steps:
       - uses: actions/checkout@v4
 
+      - name: Work out version
+        run: |
+          if [ -n "$RELEASE_TAG" ]; then V="${RELEASE_TAG#v}"; else
+            V=$(sed -n 's/^set(VOXPILOT_VERSION "\([0-9.]*\)".*/\1/p' CMakeLists.txt); fi
+          # AU versions must be numeric major.minor.patch
+          echo "$V" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "Bad version '$V' (use e.g. 1.0.1)"; exit 1; }
+          echo "VERSION=$V" >> "$GITHUB_ENV"
+          echo "Building VoxPilot $V"
+
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DVOXPILOT_VERSION="$VERSION"
 
       - name: Build (universal arm64 + x86_64)
         run: cmake --build build --config Release --target VoxPilot_AU VoxPilot_VST3 -j 4
 
-      - name: Sign (ad-hoc) and validate Audio Unit
+      - name: Sign plug-ins (ad-hoc)
         run: |
-          COMP="$HOME/Library/Audio/Plug-Ins/Components/VoxPilot.component"
-          VST3="$HOME/Library/Audio/Plug-Ins/VST3/VoxPilot.vst3"
-          codesign --force --deep -s - "$COMP"
-          codesign --force --deep -s - "$VST3"
-          lipo -info "$COMP/Contents/MacOS/VoxPilot"
+          ART=build/VoxPilot_artefacts/Release
+          codesign --force --deep -s - "$ART/AU/VoxPilot.component"
+          codesign --force --deep -s - "$ART/VST3/VoxPilot.vst3"
+          lipo -info "$ART/AU/VoxPilot.component/Contents/MacOS/VoxPilot"
+          # remove the per-user copies made by the build so the test below uses the installed ones
+          rm -rf ~/Library/Audio/Plug-Ins/Components/VoxPilot.component ~/Library/Audio/Plug-Ins/VST3/VoxPilot.vst3
+
+      - name: Build installer (.pkg)
+        run: |
+          ART=build/VoxPilot_artefacts/Release
+          installer/make-installer.sh "$ART/AU/VoxPilot.component" "$ART/VST3/VoxPilot.vst3" "$VERSION" dist
+          pkgutil --check-signature "dist/VoxPilot-$VERSION.pkg" || true
+
+      - name: Test installer + validate Audio Unit
+        run: |
+          sudo installer -pkg "dist/VoxPilot-$VERSION.pkg" -target /
+          ls -la /Library/Audio/Plug-Ins/Components/VoxPilot.component /Library/Audio/Plug-Ins/VST3/VoxPilot.vst3
+          pkgutil --pkgs | grep sbaudio
           killall -9 AudioComponentRegistrar || true
           auval -v aufx Vxpl Sbau
-          mkdir -p dist
-          cp -R "$COMP" "$VST3" dist/
-          cp README.md dist/
-          (cd dist && ditto -c -k --keepParent VoxPilot.component ../VoxPilot-AU.zip \
-                   && ditto -c -k --keepParent VoxPilot.vst3 ../VoxPilot-VST3.zip)
+
+      - name: Zip plug-ins (for manual install)
+        run: |
+          ART=build/VoxPilot_artefacts/Release
+          ditto -c -k --keepParent "$ART/AU/VoxPilot.component" dist/VoxPilot-AU.zip
+          ditto -c -k --keepParent "$ART/VST3/VoxPilot.vst3" dist/VoxPilot-VST3.zip
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: VoxPilot-macOS
+          name: VoxPilot-macOS-${{ env.VERSION }}
           path: dist
 
-      - name: Publish Release (releases, tags and manual runs with a tag)
-        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/') || inputs.release_tag != ''
+      - name: Attach to Release
+        if: env.RELEASE_TAG != ''
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.release_tag || github.event.release.tag_name || github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
           overwrite_files: true
           files: |
-            VoxPilot-AU.zip
-            VoxPilot-VST3.zip
+            dist/VoxPilot-${{ env.VERSION }}.pkg
+            dist/VoxPilot-AU.zip
+            dist/VoxPilot-VST3.zip

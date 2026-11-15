@@ -6,7 +6,9 @@ if(APPLE)
     set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "Minimum macOS version")
 endif()
 
-project(VoxPilot VERSION 1.0.0 LANGUAGES C CXX)
+# Version can be overridden by CI from the release tag: -DVOXPILOT_VERSION=1.2.3
+set(VOXPILOT_VERSION "1.0.0" CACHE STRING "Plug-in version (major.minor.patch)")
+project(VoxPilot VERSION ${VOXPILOT_VERSION} LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
