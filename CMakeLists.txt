@@ -7,7 +7,7 @@ if(APPLE)
 endif()
 
 # Version can be overridden by CI from the release tag: -DVOXPILOT_VERSION=1.2.3
-set(VOXPILOT_VERSION "1.0.0" CACHE STRING "Plug-in version (major.minor.patch)")
+set(VOXPILOT_VERSION "1.1.0" CACHE STRING "Plug-in version (major.minor.patch)")
 project(VoxPilot VERSION ${VOXPILOT_VERSION} LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
