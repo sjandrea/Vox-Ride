@@ -5,38 +5,37 @@
 
 namespace vpcol
 {
-    const juce::Colour bgTop     { 0xff2b3b45 }; // brushed slate metal
-    const juce::Colour bgBottom  { 0xff18232a };
-    const juce::Colour panelTop  { 0xff2e3f49 };
-    const juce::Colour panelBot  { 0xff1c2930 };
-    const juce::Colour well      { 0xff0a1115 }; // recessed areas
-    const juce::Colour plotTop   { 0xff10252d };
-    const juce::Colour plotBot   { 0xff09151a };
-    const juce::Colour text      { 0xffe6eaee };
-    const juce::Colour textDim   { 0xff8d9aa3 };
-    const juce::Colour accent    { 0xff2fe0d8 }; // cyan  – output / target
-    const juce::Colour gain      { 0xffffa126 }; // amber – rider gain
-    const juce::Colour vocal     { 0xff7d8fae }; // slate – raw vocal level
-    const juce::Colour detect    { 0xffff4b5f }; // red   – detection threshold
-    const juce::Colour music     { 0xffa77bff }; // violet – side-chain
-    const juce::Colour silver    { 0xffd9dde1 };
-    const juce::Colour writeCol  { 0xffe0453f };
-    const juce::Colour readCol   { 0xff43d26f };
-    const juce::Colour darkText  { 0xff0b1114 };
+    const juce::Colour panelTop  { 0xff4a5c6d }; // painted steel-blue front plate
+    const juce::Colour panelBot  { 0xff3a4a59 };
+    const juce::Colour text      { 0xffeef0ef };
+    const juce::Colour textDim   { 0xffaeb9c3 };
+    const juce::Colour cream     { 0xfff1e4c3 }; // pointers
+    const juce::Colour vuFace    { 0xfff4dfa6 };
+    const juce::Colour vuEdge    { 0xffcfa65a };
+    const juce::Colour vuInk     { 0xff1d1a14 };
+    const juce::Colour vuRed     { 0xffc9241c };
+    const juce::Colour plaque    { 0xff1d2023 };
+    const juce::Colour red       { 0xffc8231d };
+    const juce::Colour amber     { 0xffff9a1f };
+    const juce::Colour green     { 0xff3fe060 };
+    const juce::Colour silver    { 0xffdfe2e4 };
+    const juce::Colour darkText  { 0xff111315 };
+    // scope (phosphor screen)
+    const juce::Colour scopeBg   { 0xff0b120e };
+    const juce::Colour trace     { 0xff8dffb4 }; // output
+    const juce::Colour vocal     { 0xff6f8b7a }; // raw vocal level
+    const juce::Colour gainTrace { 0xffffb03a };
+    const juce::Colour detect    { 0xffff5a4e };
 }
 
-/** Shared drawing helpers for the hardware-style look. */
+/** Shared drawing helpers for the retro hardware look. */
 namespace vpdraw
 {
     void glowStroke (juce::Graphics&, const juce::Path&, juce::Colour, float width);
-    void recess (juce::Graphics&, juce::Rectangle<float>, float radius, juce::Colour fill = vpcol::well);
-    void bevelPanel (juce::Graphics&, juce::Rectangle<float>, float radius);
     void screw (juce::Graphics&, juce::Point<float> centre, float radius, float slotAngle);
-    void led (juce::Graphics&, juce::Point<float> centre, float radius, juce::Colour, bool on);
-    void faderCap (juce::Graphics&, juce::Rectangle<float>, juce::Colour stripe);
-    void faderSlot (juce::Graphics&, float cx, float top, float bottom);
-    void glowBar (juce::Graphics&, juce::Rectangle<float>, juce::Colour);
-    void dbScale (juce::Graphics&, const std::function<float (float)>& valueToY, float cx, bool labels);
+    void jewelLamp (juce::Graphics&, juce::Point<float> centre, float radius, juce::Colour, bool on);
+    void plaque (juce::Graphics&, juce::Rectangle<float>, juce::Colour fill, bool lit);
+    void brushedMetal (juce::Graphics&, juce::Rectangle<float>, bool vertical, juce::Colour light, juce::Colour dark, int seed);
 }
 
 //==============================================================================
@@ -47,21 +46,20 @@ public:
 
     void drawRotarySlider (juce::Graphics&, int x, int y, int w, int h, float pos,
                            float startAngle, float endAngle, juce::Slider&) override;
-    void drawLinearSlider (juce::Graphics&, int x, int y, int w, int h, float pos, float minPos, float maxPos,
-                           juce::Slider::SliderStyle, juce::Slider&) override;
-    int getSliderThumbRadius (juce::Slider&) override { return 12; }
     void drawButtonBackground (juce::Graphics&, juce::Button&, const juce::Colour&, bool over, bool down) override;
-    juce::Font getTextButtonFont (juce::TextButton&, int h) override;
+    void drawButtonText (juce::Graphics&, juce::TextButton&, bool over, bool down) override;
     juce::Font getLabelFont (juce::Label&) override;
     void drawLabel (juce::Graphics&, juce::Label&) override;
     juce::Label* createSliderTextBox (juce::Slider&) override;
 
-    /** Marks a label so it is drawn as a recessed value display. */
-    static void makeValueDisplay (juce::Label&);
+    /** Turns a label into a black (or coloured) engraved name plaque. */
+    static void makePlaque (juce::Label&, juce::Colour fill = vpcol::plaque);
+    /** Sets the numbers printed around a knob: "text:value,text:value,…". */
+    static void setScale (juce::Slider&, const juce::String& spec);
 };
 
 //==============================================================================
-/** Scrolling graph: vocal level, output level, target, threshold and rider gain. */
+/** Scrolling history in a phosphor "scope" screen: vocal, output, target, threshold, rider gain. */
 class HistoryView : public juce::Component
 {
 public:
@@ -75,8 +73,7 @@ public:
     void mouseMove (const juce::MouseEvent&) override;
 
 private:
-    juce::Rectangle<float> levelBox() const;
-    juce::Rectangle<float> gainBox() const;
+    juce::Rectangle<float> screen() const;
     juce::Rectangle<float> levelPlot() const;
     juce::Rectangle<float> gainPlot() const;
     float levelToY (float db) const;
@@ -90,42 +87,48 @@ private:
     std::array<HistoryFrame, 256> scratch {};
     bool draggingTarget = false;
 
-    static constexpr float minDb = -66.0f, maxDb = 0.0f;
+    static constexpr float minDb = -60.0f, maxDb = 0.0f;
 };
 
 //==============================================================================
-/** Displays the applied rider gain; draggable (writes "Rider Gain") only in Read mode. */
-class RiderFader : public juce::Component
+/** Analogue needle meter showing the applied rider gain; drag to set "Rider Gain" in Read mode. */
+class RiderMeter : public juce::Component, public juce::SettableTooltipClient
 {
 public:
-    explicit RiderFader (VoxPilotProcessor&);
+    explicit RiderMeter (VoxPilotProcessor&);
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
     void mouseUp (const juce::MouseEvent&) override;
     void mouseDoubleClick (const juce::MouseEvent&) override;
-    void setDisplayedGain (float db, bool interactive);
+    void update (float gainDb, bool interactive, AutoMode mode);
 
 private:
-    float valueToY (float db) const;
-    float yToValue (float y) const;
-    juce::Rectangle<float> track() const;
+    juce::Rectangle<float> face() const;
+    juce::Point<float> pivot() const;
+    float gainToAngle (float db) const;
 
     VoxPilotProcessor& proc;
     juce::ParameterAttachment attachment;
-    float shownDb = 0.0f;
+    float needleDb = 0.0f, targetDb = 0.0f, dragStartDb = 0.0f;
     bool canDrag = false, dragging = false;
+    AutoMode currentMode = AutoMode::off;
 };
 
 //==============================================================================
-class LevelMeter : public juce::Component, public juce::SettableTooltipClient
+/** Chrome bat-handle toggle switch (up = first option). */
+class ToggleSwitch : public juce::Component, public juce::SettableTooltipClient
 {
 public:
-    void setLevel (float db) { if (std::abs (db - level) > 0.05f) { level = db; repaint(); } }
+    ToggleSwitch (juce::String upText, juce::String downText);
     void paint (juce::Graphics&) override;
-    juce::Colour colour = vpcol::accent;
+    void mouseDown (const juce::MouseEvent&) override;
+    void setUp (bool shouldBeUp) { if (up != shouldBeUp) { up = shouldBeUp; repaint(); } }
+    std::function<void (bool up)> onFlip;
+
 private:
-    float level = -100.0f;
+    juce::String upLabel, downLabel;
+    bool up = true;
 };
 
 //==============================================================================
@@ -140,9 +143,10 @@ public:
 
 private:
     void timerCallback() override;
-    void setupKnob (juce::Slider&, juce::Label&, const juce::String& name);
+    void setupKnob (juce::Slider&, juce::Label& plaque, const juce::String& name, const char* paramId,
+                    const juce::String& scale, juce::Colour plaqueColour = vpcol::plaque);
+    void placeKnob (juce::Slider&, juce::Label& plaque, juce::Point<int> centre, int knobSize);
     void setChoice (const char* id, float normalised);
-    void drawPanel (juce::Graphics&, juce::Rectangle<int>, const juce::String& title);
     void buildBackground();
 
     VoxPilotProcessor& proc;
@@ -151,31 +155,20 @@ private:
 
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
 
-    juce::Slider targetKnob, detectKnob, bleedKnob, musicKnob;
-    juce::Label  targetLabel, detectLabel, bleedLabel, musicLabel;
-    std::unique_ptr<SliderAttachment> targetAtt, detectAtt, bleedAtt, musicAtt;
+    juce::Slider targetKnob, outputKnob, detectKnob, bleedKnob, musicKnob, cutKnob, boostKnob;
+    juce::Label  targetPlaque, outputPlaque, detectPlaque, bleedPlaque, musicPlaque, cutPlaque, boostPlaque, responsePlaque;
+    std::vector<std::unique_ptr<SliderAttachment>> attachments;
 
-    juce::Slider rangeSlider { juce::Slider::TwoValueVertical, juce::Slider::NoTextBox };
-    juce::ParameterAttachment rangeLowAtt, rangeHighAtt;
-    juce::Label rangeLabel, rangeValue;
+    RiderMeter meter;
+    HistoryView history;
+    ToggleSwitch speedSwitch { "FAST", "SLOW" };
 
-    RiderFader riderFader;
-    juce::Label riderLabel, riderValue;
-
-    juce::Slider outputSlider;
-    std::unique_ptr<SliderAttachment> outputAtt;
-    juce::Label outputLabel;
-    LevelMeter outMeter, inMeter;
-
-    juce::TextButton fastBtn { "FAST" }, slowBtn { "SLOW" };
     juce::TextButton offBtn { "OFF" }, writeBtn { "WRITE" }, readBtn { "READ" };
     std::array<juce::TextButton, 4> lookaheadBtns;
 
-    HistoryView history;
     juce::TooltipWindow tooltips { this, 600 };
 
     bool rideLed = false, scLed = false;
-    float scLevel = -100.0f;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (VoxPilotEditor)
 };

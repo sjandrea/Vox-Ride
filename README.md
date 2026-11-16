@@ -32,10 +32,10 @@ sudo rm -rf /Library/Audio/Plug-Ins/Components/VoxPilot.component /Library/Audio
 | **Vocal Detect** | Terskel for hva som regnes som vokal. Under terskelen *fryser* rideren, så pust, støy og pauser ikke dras opp. Rød stiplet linje i grafen. |
 | **Bleed Guard** | Hever detekteringsterskelen over lekkasje. Med sidechain: relativt til musikknivået (overhør i mikken ignoreres). Uten sidechain: relativt til et adaptivt støygulv. |
 | **Music Follow** | Krever sidechain. Målnivået følger musikken: løfter vokalen i kraftige partier, senker i rolige (inntil ±6 dB). |
-| **Fast / Slow** | Reaksjonstid. Slow = mykt og musikalsk (standard), Fast = tettere på ord/fraser. |
+| **Response (Fast / Slow)** | Reaksjonstid. Slow = mykt og musikalsk (standard), Fast = tettere på ord/fraser. |
 | **Lookahead (Off / 20 / 50 / 100 ms)** | Analysen ser fremover i lyden, så gainen allerede er riktig når en frase starter (ingen «for høy første stavelse»). Gir like mye forsinkelse – Logic kompenserer automatisk. Bruk **Off** ved live-bruk og innspilling, **50 ms** er et godt valg ved miksing. |
-| **Range** | Hvor mye rideren maks får kutte (nedre håndtak) og løfte (øvre håndtak). |
-| **Rider** | Viser gainen som brukes akkurat nå. I *Read*-modus kan den dras for hånd (dobbeltklikk = 0 dB). |
+| **Max Cut / Max Boost** | Hvor mye rideren maks får kutte og løfte (range). |
+| **Viserinstrumentet** | Viser rider-gainen som brukes akkurat nå. I *Read*-modus kan nålen dras for hånd (dobbeltklikk = 0 dB). |
 | **Output** | Utgangstrim etter rideren. |
 | **Automation Off / Write / Read** | Se under. |
 
