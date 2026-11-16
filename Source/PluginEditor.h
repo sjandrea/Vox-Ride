@@ -5,19 +5,38 @@
 
 namespace vpcol
 {
-    const juce::Colour bg        { 0xff0f1115 };
-    const juce::Colour panel     { 0xff181b21 };
-    const juce::Colour panelEdge { 0xff262a33 };
-    const juce::Colour well      { 0xff0b0d10 };
-    const juce::Colour text      { 0xffc9ced6 };
-    const juce::Colour textDim   { 0xff6d7480 };
-    const juce::Colour accent    { 0xff3fd0c9 }; // cyan  – output / target
-    const juce::Colour gain      { 0xffffa53d }; // amber – rider gain
-    const juce::Colour vocal     { 0xff5a6b8c }; // slate – raw vocal level
-    const juce::Colour detect    { 0xffe0566b }; // red   – detection threshold
-    const juce::Colour music     { 0xffa98bff }; // violet – side-chain
-    const juce::Colour writeCol  { 0xffd94a4a };
-    const juce::Colour readCol   { 0xff3fbf6a };
+    const juce::Colour bgTop     { 0xff2b3b45 }; // brushed slate metal
+    const juce::Colour bgBottom  { 0xff18232a };
+    const juce::Colour panelTop  { 0xff2e3f49 };
+    const juce::Colour panelBot  { 0xff1c2930 };
+    const juce::Colour well      { 0xff0a1115 }; // recessed areas
+    const juce::Colour plotTop   { 0xff10252d };
+    const juce::Colour plotBot   { 0xff09151a };
+    const juce::Colour text      { 0xffe6eaee };
+    const juce::Colour textDim   { 0xff8d9aa3 };
+    const juce::Colour accent    { 0xff2fe0d8 }; // cyan  – output / target
+    const juce::Colour gain      { 0xffffa126 }; // amber – rider gain
+    const juce::Colour vocal     { 0xff7d8fae }; // slate – raw vocal level
+    const juce::Colour detect    { 0xffff4b5f }; // red   – detection threshold
+    const juce::Colour music     { 0xffa77bff }; // violet – side-chain
+    const juce::Colour silver    { 0xffd9dde1 };
+    const juce::Colour writeCol  { 0xffe0453f };
+    const juce::Colour readCol   { 0xff43d26f };
+    const juce::Colour darkText  { 0xff0b1114 };
+}
+
+/** Shared drawing helpers for the hardware-style look. */
+namespace vpdraw
+{
+    void glowStroke (juce::Graphics&, const juce::Path&, juce::Colour, float width);
+    void recess (juce::Graphics&, juce::Rectangle<float>, float radius, juce::Colour fill = vpcol::well);
+    void bevelPanel (juce::Graphics&, juce::Rectangle<float>, float radius);
+    void screw (juce::Graphics&, juce::Point<float> centre, float radius, float slotAngle);
+    void led (juce::Graphics&, juce::Point<float> centre, float radius, juce::Colour, bool on);
+    void faderCap (juce::Graphics&, juce::Rectangle<float>, juce::Colour stripe);
+    void faderSlot (juce::Graphics&, float cx, float top, float bottom);
+    void glowBar (juce::Graphics&, juce::Rectangle<float>, juce::Colour);
+    void dbScale (juce::Graphics&, const std::function<float (float)>& valueToY, float cx, bool labels);
 }
 
 //==============================================================================
@@ -30,12 +49,15 @@ public:
                            float startAngle, float endAngle, juce::Slider&) override;
     void drawLinearSlider (juce::Graphics&, int x, int y, int w, int h, float pos, float minPos, float maxPos,
                            juce::Slider::SliderStyle, juce::Slider&) override;
+    int getSliderThumbRadius (juce::Slider&) override { return 12; }
     void drawButtonBackground (juce::Graphics&, juce::Button&, const juce::Colour&, bool over, bool down) override;
     juce::Font getTextButtonFont (juce::TextButton&, int h) override;
     juce::Font getLabelFont (juce::Label&) override;
+    void drawLabel (juce::Graphics&, juce::Label&) override;
     juce::Label* createSliderTextBox (juce::Slider&) override;
 
-    static void drawFaderCap (juce::Graphics&, juce::Rectangle<float> r, juce::Colour stripe);
+    /** Marks a label so it is drawn as a recessed value display. */
+    static void makeValueDisplay (juce::Label&);
 };
 
 //==============================================================================
@@ -45,7 +67,6 @@ class HistoryView : public juce::Component
 public:
     explicit HistoryView (VoxPilotProcessor&);
     void paint (juce::Graphics&) override;
-    void resized() override;
     void pull();
 
     void mouseDown (const juce::MouseEvent&) override;
@@ -54,10 +75,13 @@ public:
     void mouseMove (const juce::MouseEvent&) override;
 
 private:
+    juce::Rectangle<float> levelBox() const;
+    juce::Rectangle<float> gainBox() const;
+    juce::Rectangle<float> levelPlot() const;
+    juce::Rectangle<float> gainPlot() const;
     float levelToY (float db) const;
     float yToLevel (float y) const;
     float gainToY (float db) const;
-    juce::Rectangle<float> plotArea() const;
 
     VoxPilotProcessor& proc;
     static constexpr int capacity = 600; // 10 s at 60 fps
@@ -116,12 +140,14 @@ public:
 
 private:
     void timerCallback() override;
-    void setupKnob (juce::Slider&, juce::Label&, const juce::String& name, const char* paramId);
+    void setupKnob (juce::Slider&, juce::Label&, const juce::String& name);
     void setChoice (const char* id, float normalised);
     void drawPanel (juce::Graphics&, juce::Rectangle<int>, const juce::String& title);
+    void buildBackground();
 
     VoxPilotProcessor& proc;
     VPLookAndFeel lnf;
+    juce::Image background;
 
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
 
